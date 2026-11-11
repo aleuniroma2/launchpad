@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launchpad Soundboard</title>
+<style>
+:root {
+  --bg: #f3f2ef; --panel: #ffffff; --ink: #1d1d1f; --muted: #6b6b70; --line: #dcdad5;
+  --device: #26262a; --device-edge: #18181b; --pad-off: #3a3a40; --pad-ink: #f1f1f1;
+  --accent: #d98a00; --ok: #2f9e44; --bad: #c92a2a; --focus: #3b82f6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141416; --panel: #1e1e22; --ink: #ececf0; --muted: #9a9aa3; --line: #303036;
+    --device: #0d0d0f; --device-edge: #000; --pad-off: #2c2c32;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif; }
+header { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center;
+  padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+header h1 { font-size: 16px; margin: 0 8px 0 0; letter-spacing: .2px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 10px;
+  border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); display: block; }
+.pill.on i { background: var(--ok); }
+.ctl { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.spacer { flex: 1; }
+button, select, input[type=text] { font: inherit; color: var(--ink); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+button { cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button.danger { color: #fff; background: var(--bad); border-color: var(--bad); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; }
+.seg button.sel { background: var(--ink); color: var(--bg); }
+main { display: grid; grid-template-columns: minmax(0, 600px) minmax(300px, 1fr); gap: 24px;
+  padding: 24px 20px; max-width: 1200px; margin: 0 auto; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+
+/* device replica */
+.device { background: var(--device); border: 1px solid var(--device-edge); border-radius: 18px;
+  padding: 18px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+.grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 7px; }
+.btn { position: relative; aspect-ratio: 1; background: var(--pad-off); border: 0; padding: 0;
+  border-radius: 6px; color: var(--pad-ink); font-size: 9px; line-height: 1.1; overflow: hidden;
+  display: flex; align-items: flex-end; justify-content: flex-start; text-align: left;
+  transition: background-color .06s, box-shadow .06s; user-select: none; -webkit-user-select: none; }
+.btn span { padding: 4px; text-shadow: 0 1px 2px rgba(0,0,0,.8); word-break: break-word;
+  max-height: 100%; overflow: hidden; }
+.btn.round { border-radius: 50%; width: 72%; height: 72%; margin: auto; align-items: center;
+  justify-content: center; text-align: center; font-weight: 600; }
+.btn.round span { padding: 0; }
+.btn.lit { box-shadow: 0 0 12px var(--glow), inset 0 0 6px rgba(255,255,255,.25); }
+.btn.flash { animation: flash .5s steps(1) infinite; }
+@keyframes flash { 50% { background: var(--pad-off); box-shadow: none; } }
+.btn.selected { outline: 2px solid var(--focus); outline-offset: 2px; }
+.btn.held { transform: scale(.94); }
+.btn.drop { outline: 2px dashed #fff; }
+.logo { display: flex; align-items: center; justify-content: center; color: #777; font-size: 9px;
+  letter-spacing: 1px; }
+.pagebar { display: flex; justify-content: space-between; align-items: center; margin-top: 14px;
+  color: #aaa; font-size: 12px; gap: 8px; }
+.pagebar input, .pagebar select.dark { background: transparent; color: #eee; border-color: #444; }
+.pagebar input { width: 150px; }
+.pagebar select.dark option { color: #111; }
+.seg.wrap { flex-wrap: wrap; }
+.octave { display: inline-flex; align-items: center; gap: 10px; }
+.octave b { min-width: 70px; text-align: center; }
+.colors.four { grid-template-columns: repeat(4, 1fr); }
+.legend { font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; margin-top: 4px; }
+.hint { color: var(--muted); font-size: 12px; margin-top: 10px; }
+
+/* editor */
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+.panel h2 { margin: 0 0 4px; font-size: 15px; }
+.panel .sub { color: var(--muted); font-size: 12px; margin-bottom: 16px; }
+.field { margin-bottom: 14px; }
+.field > label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row select, .row input[type=text] { flex: 1; min-width: 0; }
+.colors { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.swatches { display: grid; grid-template-columns: repeat(4, 22px); gap: 4px; }
+.sw { width: 22px; height: 22px; border-radius: 4px; border: 1px solid rgba(0,0,0,.25); cursor: pointer;
+  padding: 0; }
+.sw.sel { outline: 2px solid var(--focus); outline-offset: 1px; }
+.empty { color: var(--muted); padding: 40px 0; text-align: center; }
+input[type=range] { accent-color: var(--accent); }
+.check { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Launchpad Soundboard</h1>
+  <span id="conn" class="pill"><i></i><b>Not connected</b></span>
+  <div class="seg" role="group" aria-label="Click mode">
+    <button id="mEdit" class="sel" title="Clicking a pad selects it for editing">Edit</button>
+    <button id="mPlay" title="Clicking a pad plays it like the hardware">Play</button>
+  </div>
+  <label class="check"><input type="checkbox" id="follow" checked> Select pad on hardware press</label>
+  <span class="spacer"></span>
+  <div class="ctl">Volume <input type="range" id="vol" min="0" max="1" step="0.01"></div>
+  <div class="ctl">LED brightness <input type="range" id="bright" min="0" max="12" step="1"><span id="brightTxt"></span></div>
+  <div class="ctl">
+    <select id="testLvl" aria-label="LED test level"><option value="1">Test low</option><option value="2">Test medium</option><option value="3" selected>Test full</option></select>
+    <button id="test">LED test</button>
+    <button id="anim">Animation</button>
+  </div>
+  <button id="stopAll" class="danger">Stop all</button>
+</header>
+
+<main>
+  <section>
+    <div class="device">
+      <div class="grid" id="grid"></div>
+      <div class="pagebar">
+        <span>Top row = pages</span>
+        <span class="row" style="flex:0 1 auto">
+          <select id="pageType" aria-label="Page type" class="dark">
+            <option value="soundboard">Soundboard</option><option value="piano">Piano / synth</option><option value="drums">Drum kit</option>
+          </select>
+          <input type="text" id="pageName" aria-label="Page name">
+        </span>
+      </div>
+    </div>
+    <p class="hint">Drop audio files onto a pad to assign them. Sounds keep playing when you switch pages; the page buttons flash green while they have sounds playing.</p>
+  </section>
+  <section class="panel" id="editor"><div class="empty">Select a pad (click it, or press it on the Launchpad)</div></section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+let S = null;           // full state from /api/state
+let snap = null;        // live snapshot from SSE
+let selected = null;
+let clickMode = "edit";
+let lastPressSeen = null;
+
+const R = [0, 140, 205, 255], G = [0, 130, 195, 235];
+function rgb(c) {
+  const [r, g] = c;
+  if (!r && !g) return null;
+  return `rgb(${R[r]}, ${G[g]}, ${r && g ? 20 : 30})`;
+}
+const NAMES = {"0,0":"off","1,0":"red low","2,0":"red mid","3,0":"red","0,1":"green low","0,2":"green mid",
+  "0,3":"green","1,1":"amber low","2,2":"amber mid","3,3":"amber","3,2":"orange","2,3":"yellow","1,3":"lime"};
+
+function api(path, body) {
+  return fetch(path, {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(body || {})}).then(r => r.json());
+}
+
+function ids() {
+  const out = [];
+  for (let x = 0; x < 8; x++) out.push(`top${x}`);
+  out.push("logo");
+  for (let y = 0; y < 8; y++) { for (let x = 0; x < 8; x++) out.push(`pad${x}${y}`); out.push(`side${y}`); }
+  return out;
+}
+
+function buildGrid() {
+  const grid = $("#grid");
+  for (const id of ids()) {
+    if (id === "logo") { const d = document.createElement("div"); d.className = "logo"; d.textContent = "LP"; grid.append(d); continue; }
+    const b = document.createElement("button");
+    b.className = "btn" + (id.startsWith("pad") ? "" : " round");
+    b.id = "b-" + id;
+    b.innerHTML = "<span></span>";
+    b.setAttribute("aria-label", id);
+    const down = e => {
+      e.preventDefault();
+      const inst = snap && snap.page_type !== "soundboard";  // instrument pages always play
+      if (inst || clickMode === "play" || id.startsWith("top")) { b._down = true; api("/api/press", {id, down: true}); }
+      if (clickMode === "edit" && !inst) select(id);
+    };
+    const up = () => { if (b._down) { b._down = false; api("/api/press", {id, down: false}); } };
+    b.addEventListener("pointerdown", down);
+    b.addEventListener("pointerup", up);
+    b.addEventListener("pointerleave", up);
+    if (!id.startsWith("top")) {
+      b.addEventListener("dragover", e => { e.preventDefault(); b.classList.add("drop"); });
+      b.addEventListener("dragleave", () => b.classList.remove("drop"));
+      b.addEventListener("drop", async e => {
+        e.preventDefault(); b.classList.remove("drop");
+        const f = e.dataTransfer.files[0]; if (!f) return;
+        const res = await upload(f); if (!res) return;
+        const cur = btnCfg(id) || {...S.defaults, idle: [0, 1]};
+        await saveBtn(id, {...cur, action: "sound", sound: res.name, label: cur.label || res.name.replace(/\.[^.]+$/, "")});
+        select(id);
+      });
+    }
+    grid.append(b);
+  }
+}
+
+const page = () => (snap ? snap.page : S.config.page);
+const btnCfg = id => { const b = S.config.pages[page()].buttons[id]; return b ? {...S.defaults, ...b} : null; };
+
+function render() {
+  if (!S || !snap) return;
+  const conn = $("#conn");
+  conn.classList.toggle("on", snap.connected);
+  conn.querySelector("b").textContent = snap.connected ? "Launchpad connected" : "Launchpad not connected";
+  for (const id of ids()) {
+    if (id === "logo") continue;
+    const el = $("#b-" + id);
+    const [r, g, fl] = snap.leds[id] || [0, 0, false];
+    const c = rgb([r, g]);
+    el.style.background = c || "";
+    el.style.setProperty("--glow", c || "transparent");
+    el.classList.toggle("lit", !!c);
+    el.classList.toggle("flash", !!(c && fl));
+    el.classList.toggle("selected", id === selected);
+    el.classList.toggle("held", snap.held.includes(id));
+    let label = "", title = "";
+    if (id.startsWith("top")) {
+      const p = +id.slice(3);
+      label = String(p + 1);
+      title = `${S.config.pages[p].name} (${snap.page_types[p]})`;
+    } else if (snap.labels) label = snap.labels[id] || "";
+    else { const b = btnCfg(id); if (b) label = b.action === "stop_all" ? "STOP" : b.action === "stop_page" ? "STOP PG" : (b.label || b.sound); }
+    el.querySelector("span").textContent = label;
+    el.title = title || label;
+  }
+  const pn = $("#pageName");
+  if (document.activeElement !== pn) pn.value = S.config.pages[page()].name;
+  $("#pageType").value = snap.page_type;
+}
+
+function select(id) {
+  selected = id; render(); renderEditor();
+}
+
+function swatches(key, cur) {
+  let h = `<div class="swatches" role="radiogroup" aria-label="${key} colour">`;
+  for (let g = 3; g >= 0; g--) for (let r = 0; r < 4; r++) {
+    const c = rgb([r, g]) || "var(--pad-off)";
+    const sel = cur[0] === r && cur[1] === g ? " sel" : "";
+    h += `<button class="sw${sel}" style="background:${c}" data-key="${key}" data-c="${r},${g}" title="${NAMES[r+","+g] || `red ${r} / green ${g}`}"></button>`;
+  }
+  return h + "</div>";
+}
+
+function renderInstrumentEditor() {
+  const ed = $("#editor"), p = page(), inst = snap.inst, sy = S.synth;
+  const send = patch => api("/api/instrument", {page: p, inst: patch});
+  const seg = (key, items, cur) => `<div class="seg wrap" id="seg-${key}">` + Object.entries(items).map(([v, n]) =>
+    `<button data-v="${v}" class="${v === cur ? "sel" : ""}">${esc(n)}</button>`).join("") + "</div>";
+  const col = inst.colors;
+  if (snap.page_type === "piano") {
+    const lo = inst.octave + 1, hi = inst.octave + (inst.layout === "piano" ? 5 : 4);
+    ed.innerHTML = `
+      <h2>Piano / synth</h2><div class="sub">${esc(S.config.pages[p].name)} · play on the grid · side buttons: 1–2 octave up/down, 3–8 sound</div>
+      <div class="field"><label>Sound</label>${seg("patch", sy.patches, inst.patch)}</div>
+      <div class="field"><label for="iLayout">Grid layout</label>
+        <select id="iLayout" style="width:100%">
+          <option value="piano">Piano keys: rows of white keys with black keys above, 4 octaves</option>
+          <option value="scale">Scale grid: only notes in key, each row a 4th higher</option></select></div>
+      <div class="field"><label>Key</label><div class="row">
+        <select id="iRoot" aria-label="Root note">${sy.notes.map((n, i) => `<option value="${i}">${n}</option>`).join("")}</select>
+        <select id="iScale" aria-label="Scale" ${inst.layout === "piano" ? "disabled title='Used by the scale grid layout'" : ""}>${sy.scales.map(s => `<option>${s}</option>`).join("")}</select></div></div>
+      <div class="field"><label>Octave</label><div class="octave">
+        <button id="oDown" ${inst.octave <= 0 ? "disabled" : ""}>−</button><b>C${lo} – C${hi}</b><button id="oUp" ${inst.octave >= 5 ? "disabled" : ""}>+</button></div></div>
+      <div class="field"><label for="iVol">Volume <span id="iVolTxt">${Math.round(inst.volume * 100)}%</span></label>
+        <input type="range" id="iVol" min="0" max="1.5" step="0.01" value="${inst.volume}" style="width:100%"></div>
+      <div class="field"><label>LED colours</label><div class="colors four">
+        <div><label>${inst.layout === "piano" ? "White keys" : "Notes"}</label>${swatches("key", col.key)}</div>
+        <div><label>Black keys</label>${swatches("black", col.black)}</div>
+        <div><label>Root note</label>${swatches("root", col.root)}</div>
+        <div><label>Pressed</label>${swatches("pressed", col.pressed)}</div></div></div>`;
+    $("#iLayout").value = inst.layout; $("#iRoot").value = inst.root; $("#iScale").value = inst.scale;
+    $("#iLayout").onchange = e => send({layout: e.target.value});
+    $("#iRoot").onchange = e => send({root: +e.target.value});
+    $("#iScale").onchange = e => send({scale: e.target.value});
+    $("#oDown").onclick = () => send({octave: inst.octave - 1});
+    $("#oUp").onclick = () => send({octave: inst.octave + 1});
+  } else {
+    ed.innerHTML = `
+      <h2>Drum kit</h2><div class="sub">${esc(S.config.pages[p].name)} · 16 big pads (2×2 buttons each) · side buttons: 1–3 kit, 8 stop</div>
+      <div class="field"><label>Kit</label>${seg("kit", sy.kits, inst.kit)}</div>
+      <div class="field"><label for="iVol">Volume <span id="iVolTxt">${Math.round(inst.volume * 100)}%</span></label>
+        <input type="range" id="iVol" min="0" max="1.5" step="0.01" value="${inst.volume}" style="width:100%"></div>
+      <div class="field"><label>Pressed LED colour</label>${swatches("pressed", col.pressed)}</div>
+      <div class="legend">Pads from bottom-left: ${sy.drums.map(esc).join(" · ")}. The closed hi-hat cuts off the open hi-hat, as on a real kit.</div>`;
+  }
+  ed.querySelectorAll(".seg button").forEach(b => b.onclick = () =>
+    send({[b.parentElement.id === "seg-patch" ? "patch" : "kit"]: b.dataset.v}));
+  $("#iVol").oninput = e => $("#iVolTxt").textContent = Math.round(e.target.value * 100) + "%";
+  $("#iVol").onchange = e => send({volume: +e.target.value});
+  ed.querySelectorAll(".sw").forEach(sw => sw.onclick = () =>
+    send({colors: {[sw.dataset.key]: sw.dataset.c.split(",").map(Number)}}));
+}
+
+function renderEditor() {
+  const ed = $("#editor");
+  if (snap && snap.page_type !== "soundboard" && !(selected && selected.startsWith("top"))) return renderInstrumentEditor();
+  if (!selected) { ed.innerHTML = `<div class="empty">Select a pad (click it, or press it on the Launchpad)</div>`; return; }
+  if (selected.startsWith("top")) {
+    const p = +selected.slice(3);
+    ed.innerHTML = `<h2>Page button ${p + 1}</h2><div class="sub">The top row switches between 8 pages of 72 sounds each.</div>
+      <div class="field"><label>Page name</label><input type="text" id="fPname" value="${esc(S.config.pages[p].name)}"></div>
+      <button id="goPage">Go to this page</button>`;
+    $("#fPname").onchange = e => { S.config.pages[p].name = e.target.value; api("/api/page", {page: p, name: e.target.value}); render(); };
+    $("#goPage").onclick = () => api("/api/page", {page: p});
+    return;
+  }
+  const exists = !!btnCfg(selected);
+  const b = btnCfg(selected) || {...S.defaults};
+  const where = selected.startsWith("side") ? `Side button ${+selected.slice(4) + 1}` : `Pad column ${+selected[3] + 1}, row ${+selected[4] + 1}`;
+  const opts = ['<option value="">— none —</option>'].concat(S.sounds.map(s => `<option ${s === b.sound ? "selected" : ""}>${esc(s)}</option>`)).join("");
+  ed.innerHTML = `
+    <h2>${where}</h2><div class="sub">${S.config.pages[page()].name} · changes save automatically</div>
+    <div class="field"><label for="fLabel">Label</label><input type="text" id="fLabel" style="width:100%" value="${esc(b.label)}"></div>
+    <div class="field"><label for="fAction">Action</label>
+      <select id="fAction" style="width:100%">
+        <option value="sound">Play a sound</option><option value="stop_all">Stop all sounds</option><option value="stop_page">Stop sounds on this page</option>
+      </select></div>
+    <div id="soundFields">
+      <div class="field"><label for="fSound">Sound</label>
+        <div class="row"><select id="fSound">${opts}</select>
+          <button id="preview" title="Preview through the speakers">▶ Preview</button>
+          <button id="uploadBtn">Upload…</button><input type="file" id="file" accept="audio/*" multiple hidden></div></div>
+      <div class="field"><label for="fMode">Playback</label>
+        <div class="row"><select id="fMode">
+          <option value="oneshot">One-shot (press again restarts)</option>
+          <option value="hold">Hold (plays while held)</option>
+          <option value="toggle">Toggle (press to start / stop)</option></select>
+          <label class="check"><input type="checkbox" id="fLoop" ${b.loop ? "checked" : ""}> Loop</label></div></div>
+      <div class="field"><label for="fVol">Volume <span id="volTxt">${Math.round(b.volume * 100)}%</span></label>
+        <input type="range" id="fVol" min="0" max="1.5" step="0.01" value="${b.volume}" style="width:100%"></div>
+    </div>
+    <div class="field"><label>LED colours (red increases to the right, green upward)</label>
+      <div class="colors">
+        <div><label>Idle</label>${swatches("idle", b.idle)}</div>
+        <div><label>Pressed</label>${swatches("pressed", b.pressed)}</div>
+        <div><label>Playing</label>${swatches("playing", b.playing)}</div>
+      </div></div>
+    <div class="field"><label class="check"><input type="checkbox" id="fFlash" ${b.flash ? "checked" : ""}> Flash LED while playing (hardware flashing)</label></div>
+    <div class="row"><button id="tryIt">Trigger</button><span class="spacer"></span>${exists ? '<button id="clear">Clear pad</button>' : ""}</div>`;
+  $("#fAction").value = b.action; $("#fMode").value = b.mode;
+  $("#soundFields").style.display = b.action === "sound" ? "" : "none";
+  const cur = () => btnCfg(selected) || {...S.defaults};
+  const set = (patch) => saveBtn(selected, {...cur(), ...patch});
+  $("#fLabel").onchange = e => set({label: e.target.value});
+  $("#fAction").onchange = e => { set({action: e.target.value}).then(renderEditor); };
+  $("#fSound").onchange = e => { const s = e.target.value; const c = cur(); set({sound: s, label: c.label || s.replace(/\.[^.]+$/, "")}).then(renderEditor); };
+  $("#fMode").onchange = e => set({mode: e.target.value});
+  $("#fLoop").onchange = e => set({loop: e.target.checked});
+  $("#fVol").oninput = e => $("#volTxt").textContent = Math.round(e.target.value * 100) + "%";
+  $("#fVol").onchange = e => set({volume: +e.target.value});
+  $("#fFlash").onchange = e => set({flash: e.target.checked});
+  $("#preview").onclick = () => { const s = $("#fSound").value; if (s) api("/api/preview", {sound: s, volume: +$("#fVol").value}); };
+  $("#uploadBtn").onclick = () => $("#file").click();
+  $("#file").onchange = async e => {
+    let last = null;
+    for (const f of e.target.files) last = (await upload(f)) || last;
+    if (last) { const c = cur(); await set({sound: last.name, label: c.label || last.name.replace(/\.[^.]+$/, "")}); renderEditor(); }
+  };
+  ed.querySelectorAll(".sw").forEach(sw => sw.onclick = () => {
+    set({[sw.dataset.key]: sw.dataset.c.split(",").map(Number)}).then(renderEditor);
+  });
+  const t = $("#tryIt");
+  t.onpointerdown = () => api("/api/press", {id: selected, down: true});
+  t.onpointerup = t.onpointerleave = () => api("/api/press", {id: selected, down: false});
+  if (exists) $("#clear").onclick = () => saveBtn(selected, null).then(renderEditor);
+}
+
+async function saveBtn(id, conf) {
+  const p = page();
+  if (conf) S.config.pages[p].buttons[id] = conf; else delete S.config.pages[p].buttons[id];
+  render();
+  return api("/api/button", {page: p, id, config: conf});
+}
+
+async function upload(file) {
+  const res = await fetch("/api/upload", {method: "POST", headers: {"X-Filename": file.name}, body: file}).then(r => r.json());
+  if (res.error) { alert(`${file.name}: ${res.error}`); return null; }
+  S.sounds = res.sounds;
+  return res;
+}
+
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c])); }
+
+async function init() {
+  S = await fetch("/api/state").then(r => r.json());
+  snap = S.state;
+  buildGrid();
+  $("#vol").value = S.config.master_volume;
+  $("#bright").value = S.config.brightness;
+  $("#brightTxt").textContent = S.brightness_levels[S.config.brightness];
+  $("#vol").onchange = e => api("/api/settings", {master_volume: +e.target.value});
+  $("#bright").oninput = e => { $("#brightTxt").textContent = S.brightness_levels[e.target.value]; api("/api/settings", {brightness: +e.target.value}); };
+  $("#test").onclick = () => api("/api/test_leds", {level: +$("#testLvl").value});
+  $("#anim").onclick = () => api("/api/animate");
+  $("#stopAll").onclick = () => api("/api/stop_all");
+  $("#pageName").onchange = e => { S.config.pages[page()].name = e.target.value; api("/api/page", {page: page(), name: e.target.value}); };
+  for (const [m, el] of [["edit", "#mEdit"], ["play", "#mPlay"]]) $(el).onclick = () => {
+    clickMode = m; $("#mEdit").classList.toggle("sel", m === "edit"); $("#mPlay").classList.toggle("sel", m === "play");
+  };
+  lastPressSeen = snap.last_press;
+  render();
+  const es = new EventSource("/api/events");
+  $("#pageType").onchange = e => {
+    const p = page(), t = e.target.value;
+    S.config.pages[p].type = t;
+    selected = null;
+    api("/api/instrument", {page: p, type: t});
+  };
+  es.onmessage = e => {
+    const prev = snap;
+    snap = JSON.parse(e.data);
+    if (snap.page !== prev.page) S.config.page = snap.page;
+    const isInst = snap.page_type !== "soundboard";
+    const pageChanged = snap.page !== prev.page || snap.page_type !== prev.page_type;
+    if (pageChanged && selected && !selected.startsWith("top")) selected = null;
+    if (!isInst && $("#follow").checked && snap.held.length && snap.last_press !== selected && snap.held.includes(snap.last_press)) {
+      selected = snap.last_press; renderEditor();
+    } else if (pageChanged || (isInst && JSON.stringify(snap.inst) !== JSON.stringify(prev.inst))) {
+      if (isInst && selected && selected.startsWith("top")) selected = null;
+      renderEditor();
+    }
+    render();
+  };
+}
+init();
+</script>
+</body>
+</html>
