@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Launchpad Soundboard
+Comment=Soundboard, synths, sequencer and looper for the Novation Launchpad
+Exec=@ROOT@/.venv/bin/python @ROOT@/run.py
+Path=@ROOT@
+Icon=audio-x-generic
+Terminal=true
+Categories=AudioVideo;Audio;Music;

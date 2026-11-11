@@ -18,7 +18,7 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink);
-  font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif; }
+  font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, Ubuntu, Cantarell, "Noto Sans", "DejaVu Sans", sans-serif; }
 header { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center;
   padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
 header h1 { font-size: 16px; margin: 0 8px 0 0; letter-spacing: .2px; }
@@ -89,6 +89,47 @@ main { display: grid; grid-template-columns: minmax(0, 600px) minmax(300px, 1fr)
 .empty { color: var(--muted); padding: 40px 0; text-align: center; }
 input[type=range] { accent-color: var(--accent); }
 .check { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+
+/* transport */
+.transport { display: flex; align-items: center; gap: 8px; padding: 8px 20px; border-bottom: 1px solid var(--line);
+  background: var(--panel); flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.transport input[type=number] { width: 64px; font: inherit; color: var(--ink); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 8px; padding: 5px 6px; }
+.transport button.on { background: var(--ok); border-color: var(--ok); color: #fff; }
+.beats { display: inline-flex; gap: 4px; margin-left: 4px; }
+.beats i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); display: block; }
+.beats i.on { background: var(--accent); }
+.beats i.on.first { background: var(--bad); }
+
+#aBtn.on { background: var(--ok); border-color: var(--ok); color: #fff; }
+#aBtn.wait { border-color: var(--accent); color: var(--accent); }
+
+/* effects */
+details.fx { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin-bottom: 14px; }
+details.fx summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+details.fx summary b { color: var(--ink); font-weight: 600; }
+.fxgrid { display: grid; grid-template-columns: 90px 1fr 54px; gap: 6px 10px; align-items: center; margin-top: 10px; font-size: 12px; }
+.fxgrid input[type=range] { width: 100%; }
+.fxgrid output { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+/* looper + sequencer editors */
+.tracks { display: grid; gap: 6px; margin-bottom: 14px; }
+.track { display: grid; grid-template-columns: 64px 1fr auto; gap: 8px; align-items: center;
+  border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; }
+.track b { font-size: 12px; }
+.track .st { font-size: 11px; color: var(--muted); }
+.track .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+.track .bar i { display: block; height: 100%; width: 0; background: var(--ok); }
+.track.recording .bar i, .track.armed .bar i { background: var(--bad); }
+.track.muted { opacity: .6; }
+.track .btns { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.track .btns button { padding: 4px 8px; font-size: 12px; }
+.track .btns button.rec { color: var(--bad); }
+.rowmap { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+.rowmap label { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
+.rowmap select { flex: 1; min-width: 0; }
+.slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.slots label { font-size: 11px; color: var(--muted); display: grid; gap: 2px; }
 </style>
 </head>
 <body>
@@ -110,6 +151,20 @@ input[type=range] { accent-color: var(--accent); }
   </div>
   <button id="stopAll" class="danger">Stop all</button>
 </header>
+<div class="transport" role="group" aria-label="Transport">
+  <button id="tPlay" title="Start / stop the clock (sequencer, looper, metronome)">▶ Play</button>
+  <label class="ctl">BPM <input type="number" id="tBpm" min="40" max="300" step="1"></label>
+  <button id="tTap" title="Tap a few times in rhythm to set the tempo">Tap</button>
+  <label class="check"><input type="checkbox" id="tMetro"> Metronome</label>
+  <span class="beats" id="tBeats" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+  <span class="spacer"></span>
+  <span id="tLoops"></span>
+  <label class="ctl">Sound plays on
+    <select id="aOut" aria-label="Audio output">
+      <option value="host">Host machine</option><option value="browser">This browser</option><option value="both">Both</option>
+    </select></label>
+  <button id="aBtn" title="Browsers only allow sound after a click">🔇 Browser sound off</button>
+</div>
 
 <main>
   <section>
@@ -119,7 +174,7 @@ input[type=range] { accent-color: var(--accent); }
         <span>Top row = pages</span>
         <span class="row" style="flex:0 1 auto">
           <select id="pageType" aria-label="Page type" class="dark">
-            <option value="soundboard">Soundboard</option><option value="piano">Piano / synth</option><option value="drums">Drum kit</option>
+            <option value="soundboard">Soundboard</option><option value="piano">Piano / synth</option><option value="drums">Drum kit</option><option value="sequencer">Step sequencer</option><option value="looper">Looper</option>
           </select>
           <input type="text" id="pageName" aria-label="Page name">
         </span>
@@ -243,17 +298,66 @@ function swatches(key, cur) {
   return h + "</div>";
 }
 
+const FX_UI = [
+  ["pitch", "Pitch", 1, v => (v > 0 ? "+" : "") + v + " st"],
+  ["fine", "Fine tune", 1, v => (v > 0 ? "+" : "") + v + " ct"],
+  ["drive", "Distortion", 0.01, v => Math.round(v * 100) + "%"],
+  ["crush", "Bit-crush", 0.01, v => Math.round(v * 100) + "%"],
+  ["tone", "Tone (low-pass)", 0.01, v => v >= 0.999 ? "open" : Math.round(150 * Math.pow(20000 / 150, v)) + " Hz"],
+  ["echo", "Echo", 0.01, v => Math.round(v * 100) + "%"],
+  ["echo_time", "Echo time", 0.01, v => Math.round(v * 1000) + " ms"],
+  ["reverb", "Reverb", 0.01, v => Math.round(v * 100) + "%"],
+];
+// Collapsible effects panel. onChange(patch) receives only the changed key(s).
+function fxPanel(cur, onChange, note) {
+  cur = {...S.fx_defaults, ...(cur || {})};
+  const active = FX_UI.filter(([k]) => k !== "echo_time" && cur[k] !== S.fx_defaults[k]).map(f => f[1]);
+  if (cur.reverse) active.push("Reverse");
+  const id = "fx" + Math.random().toString(36).slice(2, 7);
+  let h = `<details class="fx" id="${id}" ${fxOpen ? "open" : ""}><summary><b>Effects</b> · ${active.length ? esc(active.join(", ")) : "none"}</summary>
+    ${note ? `<div class="hint" style="margin-top:6px">${note}</div>` : ""}<div class="fxgrid">`;
+  for (const [k, label, step, fmt] of FX_UI) {
+    const [lo, hi] = S.fx_limits[k];
+    h += `<label for="${id}-${k}">${label}</label><input type="range" id="${id}-${k}" data-k="${k}" min="${lo}" max="${hi}" step="${step}" value="${cur[k]}">
+      <output id="${id}-${k}-o">${fmt(cur[k])}</output>`;
+  }
+  h += `</div><div class="row" style="margin-top:10px"><label class="check"><input type="checkbox" data-k="reverse" ${cur.reverse ? "checked" : ""}> Reverse</label>
+    <span class="spacer"></span><button type="button" data-reset>Reset effects</button></div></details>`;
+  setTimeout(() => {
+    const root = document.getElementById(id); if (!root) return;
+    root.addEventListener("toggle", () => fxOpen = root.open);
+    root.querySelectorAll("input[type=range]").forEach(r => {
+      const f = FX_UI.find(x => x[0] === r.dataset.k);
+      r.oninput = () => document.getElementById(`${id}-${r.dataset.k}-o`).textContent = f[3](+r.value);
+      r.onchange = () => onChange({[r.dataset.k]: +r.value});
+      r.ondblclick = () => { r.value = S.fx_defaults[r.dataset.k]; r.oninput(); r.onchange(); };
+    });
+    root.querySelector("input[type=checkbox]").onchange = e => onChange({reverse: e.target.checked});
+    root.querySelector("[data-reset]").onclick = () => onChange({...S.fx_defaults});
+  });
+  return h;
+}
+let fxOpen = false;
+
 function renderInstrumentEditor() {
-  const ed = $("#editor"), p = page(), inst = snap.inst, sy = S.synth;
+  const ed = $("#editor"), p = page(), sy = S.synth, type = snap.page_type;
+  if (type === "looper") return renderLooper();
+  const inst = snap.inst;
   const send = patch => api("/api/instrument", {page: p, inst: patch});
+  const sendSeq = patch => api("/api/instrument", {page: p, seq: patch});
   const seg = (key, items, cur) => `<div class="seg wrap" id="seg-${key}">` + Object.entries(items).map(([v, n]) =>
     `<button data-v="${v}" class="${v === cur ? "sel" : ""}">${esc(n)}</button>`).join("") + "</div>";
+  const vol = `<div class="field"><label for="iVol">Volume <span id="iVolTxt">${Math.round(inst.volume * 100)}%</span></label>
+        <input type="range" id="iVol" min="0" max="1.5" step="0.01" value="${inst.volume}" style="width:100%"></div>`;
   const col = inst.colors;
-  if (snap.page_type === "piano") {
+  if (type === "piano") {
     const lo = inst.octave + 1, hi = inst.octave + (inst.layout === "piano" ? 5 : 4);
+    const slotSel = i => `<label>Side ${i + 3}<select data-slot="${i}">` + Object.entries(sy.patches).map(([v, n]) =>
+      `<option value="${v}" ${inst.slots[i] === v ? "selected" : ""}>${esc(n)}</option>`).join("") + "</select></label>";
     ed.innerHTML = `
-      <h2>Piano / synth</h2><div class="sub">${esc(S.config.pages[p].name)} · play on the grid · side buttons: 1–2 octave up/down, 3–8 sound</div>
-      <div class="field"><label>Sound</label>${seg("patch", sy.patches, inst.patch)}</div>
+      <h2>Piano / synth</h2><div class="sub">${esc(S.config.pages[p].name)} · play on the grid · side buttons: 1–2 octave up/down, 3–8 sound slots</div>
+      <div class="field"><label>Sound (${Object.keys(sy.patches).length} instruments)</label>${seg("patch", sy.patches, inst.patch)}</div>
+      <div class="field"><label>Sounds on side buttons 3–8</label><div class="slots">${[0,1,2,3,4,5].map(slotSel).join("")}</div></div>
       <div class="field"><label for="iLayout">Grid layout</label>
         <select id="iLayout" style="width:100%">
           <option value="piano">Piano keys: rows of white keys with black keys above, 4 octaves</option>
@@ -263,8 +367,8 @@ function renderInstrumentEditor() {
         <select id="iScale" aria-label="Scale" ${inst.layout === "piano" ? "disabled title='Used by the scale grid layout'" : ""}>${sy.scales.map(s => `<option>${s}</option>`).join("")}</select></div></div>
       <div class="field"><label>Octave</label><div class="octave">
         <button id="oDown" ${inst.octave <= 0 ? "disabled" : ""}>−</button><b>C${lo} – C${hi}</b><button id="oUp" ${inst.octave >= 5 ? "disabled" : ""}>+</button></div></div>
-      <div class="field"><label for="iVol">Volume <span id="iVolTxt">${Math.round(inst.volume * 100)}%</span></label>
-        <input type="range" id="iVol" min="0" max="1.5" step="0.01" value="${inst.volume}" style="width:100%"></div>
+      ${vol}
+      ${fxPanel(inst.fx, patch => send({fx: patch}), "Pitch transposes the synth (and fine-tunes it in cents).")}
       <div class="field"><label>LED colours</label><div class="colors four">
         <div><label>${inst.layout === "piano" ? "White keys" : "Notes"}</label>${swatches("key", col.key)}</div>
         <div><label>Black keys</label>${swatches("black", col.black)}</div>
@@ -276,21 +380,102 @@ function renderInstrumentEditor() {
     $("#iScale").onchange = e => send({scale: e.target.value});
     $("#oDown").onclick = () => send({octave: inst.octave - 1});
     $("#oUp").onclick = () => send({octave: inst.octave + 1});
-  } else {
+    ed.querySelectorAll("[data-slot]").forEach(sel => sel.onchange = () => {
+      const slots = [...inst.slots]; slots[+sel.dataset.slot] = sel.value; send({slots});
+    });
+  } else if (type === "drums") {
     ed.innerHTML = `
-      <h2>Drum kit</h2><div class="sub">${esc(S.config.pages[p].name)} · 16 big pads (2×2 buttons each) · side buttons: 1–3 kit, 8 stop</div>
+      <h2>Drum kit</h2><div class="sub">${esc(S.config.pages[p].name)} · 16 big pads (2×2 buttons each) · side buttons: 1–${Object.keys(sy.kits).length} kit, 8 stop</div>
       <div class="field"><label>Kit</label>${seg("kit", sy.kits, inst.kit)}</div>
-      <div class="field"><label for="iVol">Volume <span id="iVolTxt">${Math.round(inst.volume * 100)}%</span></label>
-        <input type="range" id="iVol" min="0" max="1.5" step="0.01" value="${inst.volume}" style="width:100%"></div>
+      ${vol}
+      ${fxPanel(inst.fx, patch => send({fx: patch}), "Pitch tunes the drums like a sampler (lower = longer, deeper).")}
       <div class="field"><label>Pressed LED colour</label>${swatches("pressed", col.pressed)}</div>
       <div class="legend">Pads from bottom-left: ${sy.drums.map(esc).join(" · ")}. The closed hi-hat cuts off the open hi-hat, as on a real kit.</div>`;
+  } else if (type === "sequencer") {
+    const seq = snap.seq;
+    const rowSel = y => `<label>Row ${y + 1}<select data-row="${y}">` + sy.drums.map((d, i) =>
+      `<option value="${i}" ${seq.rows[y] === i ? "selected" : ""}>${esc(d)}</option>`).join("") + "</select></label>";
+    ed.innerHTML = `
+      <h2>Step sequencer</h2><div class="sub">${esc(S.config.pages[p].name)} · tap pads to toggle 16th-note steps · side buttons: 1–4 step block, 5 play/stop, 6 next kit, 7 length, 8 clear</div>
+      <div class="field"><label>Kit</label>${seg("kit", sy.kits, inst.kit)}</div>
+      <div class="field"><label>Pattern length</label><div class="seg" id="seqLen">${S.seq_lengths.map(n =>
+        `<button data-n="${n}" class="${n === seq.length ? "sel" : ""}">${n} steps</button>`).join("")}</div></div>
+      <div class="field"><label for="iSwing">Swing <span id="iSwingTxt">${Math.round(inst.swing * 200)}%</span></label>
+        <input type="range" id="iSwing" min="0" max="0.5" step="0.01" value="${inst.swing}" style="width:100%"></div>
+      ${vol}
+      ${fxPanel(inst.fx, patch => send({fx: patch}))}
+      <div class="field"><label>Sound of each row (top to bottom)</label><div class="rowmap">${[0,1,2,3,4,5,6,7].map(rowSel).join("")}</div></div>
+      <div class="row"><span class="hint" style="margin:0">Every sequencer page plays along whenever the clock runs.</span><span class="spacer"></span><button id="seqClear">Clear pattern</button></div>`;
+    ed.querySelectorAll("#seqLen button").forEach(b => b.onclick = () => sendSeq({length: +b.dataset.n}));
+    ed.querySelectorAll("[data-row]").forEach(sel => sel.onchange = () => sendSeq({rows: {[sel.dataset.row]: +sel.value}}));
+    $("#iSwing").oninput = e => $("#iSwingTxt").textContent = Math.round(e.target.value * 200) + "%";
+    $("#iSwing").onchange = e => send({swing: +e.target.value});
+    $("#seqClear").onclick = () => sendSeq({clear: true});
   }
-  ed.querySelectorAll(".seg button").forEach(b => b.onclick = () =>
+  ed.querySelectorAll(".seg[id^=seg-] button").forEach(b => b.onclick = () =>
     send({[b.parentElement.id === "seg-patch" ? "patch" : "kit"]: b.dataset.v}));
   $("#iVol").oninput = e => $("#iVolTxt").textContent = Math.round(e.target.value * 100) + "%";
   $("#iVol").onchange = e => send({volume: +e.target.value});
   ed.querySelectorAll(".sw").forEach(sw => sw.onclick = () =>
     send({colors: {[sw.dataset.key]: sw.dataset.c.split(",").map(Number)}}));
+}
+
+const TRACK_STATE = {empty: "empty", armed: "waiting for the next bar…", recording: "recording", playing: "playing", muted: "muted"};
+function renderLooper() {
+  const ed = $("#editor"), t = snap.transport;
+  let h = `<h2>Looper</h2><div class="sub">Arm a loop, then play any page (soundboard, piano, drums): what you play is recorded and repeats in time.
+    On the Launchpad each row is a loop: pads 1–6 record / mute, 7 overdub, 8 clear.
+    Side buttons: play, metronome, tempo −/+, tap, loop length, quantize, clear all.</div>
+    <div class="field"><label>Length of new loops</label><div class="seg" id="lBars">${S.loop_bars.map(n =>
+      `<button data-n="${n}" class="${n === t.bars ? "sel" : ""}">${n} bar${n > 1 ? "s" : ""}</button>`).join("")}</div></div>
+    <div class="field"><label class="check"><input type="checkbox" id="lQuant" ${t.quantize ? "checked" : ""}> Quantize recorded hits to 16th notes</label></div>
+    <div class="tracks">`;
+  for (let i = 0; i < S.num_tracks; i++) h += `<div class="track" id="trk${i}"><div><b>Loop ${i + 1}</b><div class="st"></div></div>
+      <div><div class="bar"><i></i></div></div>
+      <div class="btns"><button data-a="main"></button><button data-a="overdub">Overdub</button><button data-a="undo">Undo</button>
+        <button data-a="bounce" title="Save this loop as a WAV in the sounds folder, to put on a soundboard pad">Save as sound</button><button data-a="clear">Clear</button></div></div>`;
+  ed.innerHTML = h + `</div><div class="hint" id="lMsg">Tip: turn on the metronome while recording the first loop.</div>`;
+  ed.querySelectorAll("#lBars button").forEach(b => b.onclick = () => api("/api/transport", {bars: +b.dataset.n}));
+  $("#lQuant").onchange = e => api("/api/transport", {quantize: e.target.checked});
+  for (let i = 0; i < S.num_tracks; i++) $("#trk" + i).querySelectorAll("button").forEach(b => b.onclick = async () => {
+    const res = await api("/api/looper", {track: i, action: b.dataset.a});
+    if (b.dataset.a === "bounce") {
+      if (res.error) $("#lMsg").textContent = res.error;
+      else { S.sounds = res.sounds; $("#lMsg").textContent = `Saved sounds/${res.name}. Assign it to any soundboard pad.`; }
+    }
+  });
+  updateLooper();
+}
+function updateLooper() {
+  if (!snap.tracks || !$("#trk0")) return;
+  snap.tracks.forEach((tr, i) => {
+    const el = $("#trk" + i); if (!el) return;
+    el.className = "track " + tr.state;
+    const has = tr.state === "playing" || tr.state === "muted";
+    el.querySelector(".st").textContent = has ? `${TRACK_STATE[tr.state]}${tr.overdub ? " + overdub" : ""} · ${tr.bars} bar${tr.bars > 1 ? "s" : ""} · ${tr.events} hits`
+      : TRACK_STATE[tr.state];
+    el.querySelector(".bar i").style.width = (tr.progress * 100) + "%";
+    const main = el.querySelector("[data-a=main]");
+    main.textContent = {empty: "● Record", armed: "Cancel", recording: "■ Finish", playing: "Mute", muted: "Unmute"}[tr.state];
+    main.className = tr.state === "empty" ? "rec" : "";
+    el.querySelector("[data-a=overdub]").disabled = !has;
+    el.querySelector("[data-a=overdub]").textContent = tr.overdub ? "Stop overdub" : "Overdub";
+    el.querySelector("[data-a=undo]").disabled = !tr.undo;
+    el.querySelector("[data-a=bounce]").disabled = !has;
+    el.querySelector("[data-a=clear]").disabled = tr.state === "empty";
+  });
+}
+
+function renderTransport() {
+  const t = snap.transport;
+  $("#tPlay").textContent = t.playing ? "■ Stop" : "▶ Play";
+  $("#tPlay").classList.toggle("on", t.playing);
+  if (document.activeElement !== $("#tBpm")) $("#tBpm").value = Math.round(t.bpm * 10) / 10;
+  $("#tMetro").checked = t.metronome;
+  const beat = t.playing ? Math.floor(t.beat) : -1;
+  $("#tBeats").querySelectorAll("i").forEach((el, i) => { el.classList.toggle("on", t.playing && ((beat % 4) + 4) % 4 === i); el.classList.toggle("first", i === 0); });
+  const busy = snap.tracks.filter(x => x.state !== "empty");
+  $("#tLoops").textContent = busy.length ? `Loops: ${busy.map(x => x.state === "recording" || x.state === "armed" ? "●" : x.state === "muted" ? "○" : "▶").join(" ")}` : "";
 }
 
 function renderEditor() {
@@ -331,6 +516,7 @@ function renderEditor() {
       <div class="field"><label for="fVol">Volume <span id="volTxt">${Math.round(b.volume * 100)}%</span></label>
         <input type="range" id="fVol" min="0" max="1.5" step="0.01" value="${b.volume}" style="width:100%"></div>
     </div>
+    ${b.action === "sound" ? fxPanel(b.fx, patch => set({fx: {...(cur().fx || {}), ...patch}}).then(renderEditor), "Pitch works like a sampler: higher is also faster.") : ""}
     <div class="field"><label>LED colours (red increases to the right, green upward)</label>
       <div class="colors">
         <div><label>Idle</label>${swatches("idle", b.idle)}</div>
@@ -351,7 +537,7 @@ function renderEditor() {
   $("#fVol").oninput = e => $("#volTxt").textContent = Math.round(e.target.value * 100) + "%";
   $("#fVol").onchange = e => set({volume: +e.target.value});
   $("#fFlash").onchange = e => set({flash: e.target.checked});
-  $("#preview").onclick = () => { const s = $("#fSound").value; if (s) api("/api/preview", {sound: s, volume: +$("#fVol").value}); };
+  $("#preview").onclick = () => { const s = $("#fSound").value; if (s) api("/api/preview", {sound: s, volume: +$("#fVol").value, fx: cur().fx}); };
   $("#uploadBtn").onclick = () => $("#file").click();
   $("#file").onchange = async e => {
     let last = null;
@@ -395,12 +581,21 @@ async function init() {
   $("#test").onclick = () => api("/api/test_leds", {level: +$("#testLvl").value});
   $("#anim").onclick = () => api("/api/animate");
   $("#stopAll").onclick = () => api("/api/stop_all");
+  $("#tPlay").onclick = () => api("/api/transport", {play: !snap.transport.playing});
+  $("#tBpm").onchange = e => api("/api/transport", {bpm: +e.target.value});
+  $("#tTap").onclick = () => api("/api/transport", {tap: true});
+  $("#tMetro").onchange = e => api("/api/transport", {metronome: e.target.checked});
+  document.addEventListener("keydown", e => {   // space = play/stop (unless typing)
+    if (e.code === "Space" && !/INPUT|SELECT|TEXTAREA|BUTTON/.test(document.activeElement.tagName)) {
+      e.preventDefault(); api("/api/transport", {play: !snap.transport.playing});
+    }
+  });
   $("#pageName").onchange = e => { S.config.pages[page()].name = e.target.value; api("/api/page", {page: page(), name: e.target.value}); };
   for (const [m, el] of [["edit", "#mEdit"], ["play", "#mPlay"]]) $(el).onclick = () => {
     clickMode = m; $("#mEdit").classList.toggle("sel", m === "edit"); $("#mPlay").classList.toggle("sel", m === "play");
   };
   lastPressSeen = snap.last_press;
-  render();
+  render(); renderTransport(); renderEditor(); initAudioUi();
   const es = new EventSource("/api/events");
   $("#pageType").onchange = e => {
     const p = page(), t = e.target.value;
@@ -417,13 +612,153 @@ async function init() {
     if (pageChanged && selected && !selected.startsWith("top")) selected = null;
     if (!isInst && $("#follow").checked && snap.held.length && snap.last_press !== selected && snap.held.includes(snap.last_press)) {
       selected = snap.last_press; renderEditor();
-    } else if (pageChanged || (isInst && JSON.stringify(snap.inst) !== JSON.stringify(prev.inst))) {
+    } else if (pageChanged || (isInst && (JSON.stringify(snap.inst) !== JSON.stringify(prev.inst)
+        || seqShape(snap) !== seqShape(prev) || (snap.page_type === "looper" && loopShape(snap) !== loopShape(prev))))) {
       if (isInst && selected && selected.startsWith("top")) selected = null;
       renderEditor();
     }
-    render();
+    if (snap.page_type === "looper") updateLooper();
+    if (prev.audio.output !== snap.audio.output && snap.audio.output === "host" && BA.on) stopBrowserAudio();
+    render(); renderTransport(); updateAudioUi();
   };
 }
+
+// ------------------------------------------------------------------ browser audio
+// The server mixes everything and streams 16-bit stereo PCM from /api/audio; we buffer a few
+// tens of ms and play it with an AudioWorklet (secure contexts) or a ScriptProcessor (plain http).
+const RING_SRC = `
+class Ring {
+  constructor(sr) { this.n = sr * 2; this.L = new Float32Array(this.n); this.R = new Float32Array(this.n);
+    this.w = 0; this.r = 0; this.count = 0; this.target = Math.round(sr * 0.06); this.max = Math.round(sr * 0.25);
+    this.priming = true; }
+  push(l, r) { for (let i = 0; i < l.length; i++) { this.L[this.w] = l[i]; this.R[this.w] = r[i]; this.w = (this.w + 1) % this.n; }
+    this.count = Math.min(this.n, this.count + l.length);
+    if (this.count > this.max) { const drop = this.count - this.target; this.r = (this.r + drop) % this.n; this.count -= drop; } }
+  pull(outL, outR) {
+    if (this.priming && this.count < this.target) { outL.fill(0); outR.fill(0); return; }
+    this.priming = false;
+    for (let i = 0; i < outL.length; i++) {
+      if (this.count > 0) { outL[i] = this.L[this.r]; outR[i] = this.R[this.r]; this.r = (this.r + 1) % this.n; this.count--; }
+      else { outL[i] = 0; outR[i] = 0; this.priming = true; }
+    } }
+}`;
+const WORKLET_SRC = RING_SRC + `
+registerProcessor("lp-stream", class extends AudioWorkletProcessor {
+  constructor() { super(); this.ring = new Ring(sampleRate); this.port.onmessage = e => this.ring.push(e.data[0], e.data[1]); }
+  process(_in, outs) { const o = outs[0]; this.ring.pull(o[0], o[1] || new Float32Array(o[0].length)); return true; }
+});`;
+const BA = {on: false, ctx: null, node: null, ring: null, ctrl: null, worklet: false, rs: {pos: 0, l: 0, r: 0}};
+const browserWanted = () => snap && snap.audio.output !== "host";
+
+async function startBrowserAudio() {
+  if (BA.on) return;
+  BA.on = true; updateAudioUi();
+  const sr = S.samplerate;
+  try { BA.ctx = new AudioContext({sampleRate: sr, latencyHint: "interactive"}); }
+  catch (e) { BA.ctx = new AudioContext({latencyHint: "interactive"}); }  // resampled below
+  await BA.ctx.resume();
+  BA.worklet = false;
+  if (window.isSecureContext && BA.ctx.audioWorklet) {
+    try {
+      const url = URL.createObjectURL(new Blob([WORKLET_SRC], {type: "application/javascript"}));
+      await BA.ctx.audioWorklet.addModule(url);
+      BA.node = new AudioWorkletNode(BA.ctx, "lp-stream", {numberOfInputs: 0, outputChannelCount: [2]});
+      BA.worklet = true;
+    } catch (e) { console.warn("AudioWorklet unavailable, falling back", e); }
+  }
+  if (!BA.worklet) {
+    BA.ring = new (new Function(RING_SRC + "; return Ring;")())(BA.ctx.sampleRate);
+    BA.node = BA.ctx.createScriptProcessor(1024, 1, 2);
+    BA.node.onaudioprocess = e => BA.ring.pull(e.outputBuffer.getChannelData(0), e.outputBuffer.getChannelData(1));
+  }
+  BA.node.connect(BA.ctx.destination);
+  streamLoop();
+  updateAudioUi();
+}
+
+function stopBrowserAudio() {
+  BA.on = false;
+  if (BA.ctrl) BA.ctrl.abort();
+  if (BA.ctx) BA.ctx.close();
+  BA.ctx = BA.node = BA.ring = BA.ctrl = null;
+  updateAudioUi();
+}
+
+function pushPcm(bytes) {
+  const n = bytes.length >> 2, v = new DataView(bytes.buffer, bytes.byteOffset, n * 4);
+  let l = new Float32Array(n), r = new Float32Array(n);
+  for (let i = 0; i < n; i++) { l[i] = v.getInt16(4 * i, true) / 32768; r[i] = v.getInt16(4 * i + 2, true) / 32768; }
+  const ratio = S.samplerate / BA.ctx.sampleRate;
+  if (Math.abs(ratio - 1) > 1e-6) {          // linear resampling, continuous across chunks
+    const st = BA.rs, out = Math.floor((n - st.pos) / ratio), L2 = new Float32Array(out), R2 = new Float32Array(out);
+    for (let i = 0; i < out; i++) {
+      const p = st.pos + i * ratio, k = Math.floor(p), f = p - k;
+      const l0 = k < 0 ? st.l : l[k], r0 = k < 0 ? st.r : r[k], l1 = l[Math.min(n - 1, k + 1)], r1 = r[Math.min(n - 1, k + 1)];
+      L2[i] = l0 + (l1 - l0) * f; R2[i] = r0 + (r1 - r0) * f;
+    }
+    st.pos = st.pos + out * ratio - n; st.l = l[n - 1]; st.r = r[n - 1];
+    l = L2; r = R2;
+  }
+  if (BA.worklet) BA.node.port.postMessage([l, r], [l.buffer, r.buffer]);
+  else BA.ring.push(l, r);
+}
+
+async function streamLoop() {
+  while (BA.on) {
+    BA.ctrl = new AbortController();
+    try {
+      const res = await fetch("/api/audio", {signal: BA.ctrl.signal, cache: "no-store"});
+      const reader = res.body.getReader();
+      let rest = new Uint8Array(0);
+      for (;;) {
+        const {value, done} = await reader.read();
+        if (done || !BA.on) break;
+        let buf = value;
+        if (rest.length) { buf = new Uint8Array(rest.length + value.length); buf.set(rest); buf.set(value, rest.length); }
+        const usable = buf.length - (buf.length % 4);
+        if (usable) pushPcm(buf.subarray(0, usable));
+        rest = buf.slice(usable);
+      }
+    } catch (e) { if (!BA.on) break; }
+    if (BA.on) await new Promise(r => setTimeout(r, 1000));  // server restarted? reconnect
+  }
+}
+
+function updateAudioUi() {
+  if (!snap) return;
+  const sel = $("#aOut"), btn = $("#aBtn");
+  if (document.activeElement !== sel) sel.value = snap.audio.output;
+  const want = browserWanted();
+  btn.hidden = !want && !BA.on;
+  btn.classList.toggle("on", BA.on);
+  btn.classList.toggle("wait", want && !BA.on);
+  btn.textContent = BA.on ? "🔊 Browser sound on" : "🔇 Click to enable browser sound";
+}
+
+function initAudioUi() {
+  const sel = $("#aOut");
+  if (!S.host_audio) for (const o of sel.options) if (o.value !== "browser") o.textContent += " (no sound card)";
+  sel.onchange = async e => {
+    const out = e.target.value;
+    await api("/api/settings", {audio_output: out});
+    if (out === "host") stopBrowserAudio(); else startBrowserAudio();   // the change is a user gesture
+  };
+  $("#aBtn").onclick = () => {
+    if (BA.on) { stopBrowserAudio(); try { localStorage.setItem("lpBrowserAudio", "off"); } catch (e) {} }
+    else { startBrowserAudio(); try { localStorage.removeItem("lpBrowserAudio"); } catch (e) {} }
+  };
+  // Browsers need a click before playing sound: start on the first interaction if wanted.
+  const firstGesture = () => {
+    let off = false; try { off = localStorage.getItem("lpBrowserAudio") === "off"; } catch (e) {}
+    if (browserWanted() && !BA.on && !off) startBrowserAudio();
+  };
+  document.addEventListener("pointerdown", firstGesture, {once: true, capture: true});
+  document.addEventListener("keydown", firstGesture, {once: true, capture: true});
+  updateAudioUi();
+}
+
+const seqShape = s => s.seq ? JSON.stringify([s.seq.rows, s.seq.length]) : "";
+const loopShape = s => JSON.stringify([s.transport.bars, s.transport.quantize]);
 init();
 </script>
 </body>

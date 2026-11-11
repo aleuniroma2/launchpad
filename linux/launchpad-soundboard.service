@@ -1,0 +1,12 @@
+[Unit]
+Description=Launchpad soundboard (GUI on http://127.0.0.1:8765)
+After=pipewire.service pulseaudio.service sound.target
+
+[Service]
+WorkingDirectory=@ROOT@
+ExecStart=@ROOT@/.venv/bin/python @ROOT@/run.py --no-browser
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

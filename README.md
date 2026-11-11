@@ -20,7 +20,27 @@ Driver-only tools:
 .venv/bin/python -m lpdriver test      # hardware LED test
 ```
 
-Linux works too (install `libusb-1.0`; you may need a udev rule granting access to `1235:000e`).
+## Setup (Linux)
+
+```sh
+linux/install.sh                 # libusb + PortAudio + libsndfile, udev rule, Python venv
+.venv/bin/python run.py          # GUI at http://127.0.0.1:8765
+```
+
+* `linux/install.sh --service` also starts it at login (systemd user service),
+  `--desktop` adds an application-menu launcher.
+* Only the USB permission? `sudo linux/install-udev.sh` installs
+  `linux/50-novation-launchpad.rules` and applies it to a plugged-in Launchpad (no replug needed).
+  Without it the driver prints a hint instead of failing silently.
+* Headless box / Raspberry Pi: `run.py --host 0.0.0.0 --no-browser`, then open
+  `http://<machine-ip>:8765` from any computer or phone on the network (there is no login, so only do this on a trusted network).
+
+## Where the sound plays
+
+The header selector chooses **Host machine** (the computer running `run.py`), **This browser**
+(the server streams its mix to the GUI page, about 60–100 ms of latency) or **Both**. Default: host on macOS,
+browser on Linux. The browser needs one click before it may play sound. Choose a specific
+host sound card with `LAUNCHPAD_AUDIO_DEVICE=<name or index>` (list them with `python -m sounddevice`).
 
 ## Soundboard
 
@@ -35,20 +55,37 @@ Linux works too (install `libusb-1.0`; you may need a udev rule granting access 
 
 ## Instruments
 
-Any page can be switched (dropdown under the pad in the GUI) between **Soundboard**, **Piano / synth**
-and **Drum kit**. By default page 7 is a piano and page 8 a drum kit, so the top-row buttons switch
+Any page can be switched (dropdown under the pad in the GUI) between **Soundboard**, **Piano / synth**,
+**Drum kit**, **Step sequencer** and **Looper**. By default page 5 is a sequencer and page 6 a looper. By default page 7 is a piano and page 8 a drum kit, so the top-row buttons switch
 between the soundboard and the instruments. All instrument sounds are synthesized in
 `soundboard/synth.py`, with no sample files needed.
 
-* **Piano / synth**: six sounds (E-Piano, Pluck, Supersaw lead, Bass, Pad, Organ), on side buttons 3–8;
-  side buttons 1–2 shift the octave. Two grid layouts:
+* **Piano / synth**: 15 sounds (E-Piano, Pluck, Supersaw lead, Bass, Pad, Organ, FM bell, Strings, Brass,
+  Acid bass, Marimba, Karplus-Strong guitar, Vox choir, Chiptune, 808 sub bass). Any six of them sit on
+  side buttons 3–8 (choose which in the GUI); side buttons 1–2 shift the octave. Two grid layouts:
   *Piano keys* (pairs of rows = white keys + black keys above, 4 octaves) or
   *Scale grid* (only notes in the chosen key/scale, each row a 4th higher; 10 scales).
   The root note is highlighted; pressing a note lights every pad that plays that note.
   Notes sustain while held and use per-sound release times.
 * **Drum kit**: 16 big pads (2×2 buttons each) with kick, sub kick, snare, clap, closed/open hat
-  (closed chokes open), shaker, ride, 3 toms, crash, rim, cowbell, conga and zap. Three synthesized kits
-  (808-, 909- and electro-style) on side buttons 1–3; side 8 stops everything.
+  (closed chokes open), shaker, ride, 3 toms, crash, rim, cowbell, conga and zap. Five synthesized kits
+  (808, 909, electro, lo-fi, industrial) on side buttons 1–5; side 8 stops everything.
+* **Step sequencer**: 8 rows (pick the drum for each) × 8/16/32 sixteenth-note steps, swing.
+  Side buttons: 1–4 step block, 5 play/stop, 6 next kit, 7 length, 8 clear. Every sequencer page plays
+  along while the clock runs, and the patterns are saved.
+* **Looper**: 8 loops locked to the tempo. Arm one, then play any other page; what you play is recorded
+  (1/2/4/8 bars, optional 16th-note quantize), then repeats. Each row is a loop: pads 1–6
+  record / mute / unmute, 7 overdub, 8 clear. Side: play, metronome, tempo −/+, tap tempo, loop length,
+  quantize, clear all. In the GUI: undo overdub, and *Save as sound* bounces a loop to a WAV in
+  `sounds/` so you can put it on a soundboard pad. Loops live in memory (not saved).
+* **Tempo bar** (GUI): play/stop (or space), BPM, tap tempo, metronome. All timing is scheduled
+  ahead on the audio sample clock, so it stays tight even though it's Python.
+
+## Effects
+
+Every soundboard pad and every instrument page has an **Effects** panel: pitch (±24 semitones) and fine tune,
+distortion, bit-crusher, low-pass tone, echo (with time), reverb and reverse. On synths, pitch transposes;
+on samples and drums it works like a sampler (higher = faster). Processed sounds are cached.
 * Top-row LEDs show each page's type: orange = piano, red = drums, green = soundboard with sounds.
 
 ## Protocol notes (as observed on hardware)

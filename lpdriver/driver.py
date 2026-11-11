@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import os
 import queue
+import sys
 import threading
 import time
 from dataclasses import dataclass
@@ -146,6 +147,7 @@ class Launchpad:
         self._conn_cbs: List[Callable[[bool], None]] = []
         self._held: set = set()
         self._threads: List[threading.Thread] = []
+        self._warned_access = False
 
     # ------------------------------------------------------------------ public API
     def on_button(self, cb: Callable[[ButtonEvent], None]) -> None:
@@ -324,11 +326,18 @@ class Launchpad:
 
     def _backend(self):
         import usb.backend.libusb1 as libusb1
-        candidates = [self._libusb_path, os.environ.get("LIBUSB_PATH"),
-                      "/opt/homebrew/lib/libusb-1.0.dylib", "/usr/local/lib/libusb-1.0.dylib"]
+        candidates = [self._libusb_path, os.environ.get("LIBUSB_PATH")]
+        if sys.platform == "darwin":
+            candidates += ["/opt/homebrew/lib/libusb-1.0.dylib", "/usr/local/lib/libusb-1.0.dylib"]
+        elif sys.platform.startswith("linux"):
+            candidates += ["/usr/lib/x86_64-linux-gnu/libusb-1.0.so.0", "/usr/lib/aarch64-linux-gnu/libusb-1.0.so.0",
+                           "/usr/lib/arm-linux-gnueabihf/libusb-1.0.so.0", "/usr/lib64/libusb-1.0.so.0",
+                           "/usr/lib/libusb-1.0.so.0", "/usr/local/lib/libusb-1.0.so.0"]
         for c in candidates:
             if c and os.path.exists(c):
-                return libusb1.get_backend(find_library=lambda _x, c=c: c)
+                backend = libusb1.get_backend(find_library=lambda _x, c=c: c)
+                if backend is not None:
+                    return backend
         return libusb1.get_backend()
 
     def _open(self) -> bool:
@@ -343,9 +352,16 @@ class Launchpad:
                 pass
             dev.set_configuration()
             usb.util.claim_interface(dev, 0)
-        except usb.core.USBError:
+        except usb.core.USBError as e:
             usb.util.dispose_resources(dev)
+            if e.errno == 13 and not self._warned_access:  # EACCES: no udev rule on Linux
+                self._warned_access = True
+                print("[lpdriver] Launchpad found but access was denied (USB 1235:000e).\n"
+                      "           On Linux install the udev rule:  sudo linux/install-udev.sh\n"
+                      "           (or run linux/install.sh), then unplug and replug the Launchpad.",
+                      file=sys.stderr)
             return False
+        self._warned_access = False
         self._dev = dev
         while not self._out.empty():
             self._out.get_nowait()

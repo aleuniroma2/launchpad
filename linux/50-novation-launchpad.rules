@@ -1,0 +1,7 @@
+# Novation Launchpad (first generation, 2009) - USB 1235:000e
+# Lets non-root users open the device through libusb.
+#  * TAG+="uaccess" grants access to the user logged in at the local seat (desktop sessions).
+#  * MODE="0666" also covers SSH / headless / systemd-service setups where there is no seat.
+#    Prefer group-based access?  Replace MODE="0666" with  GROUP="plugdev", MODE="0660"
+#    and add yourself to that group.
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1235", ATTRS{idProduct}=="000e", TAG+="uaccess", MODE="0666"
