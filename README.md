@@ -104,6 +104,43 @@ on samples and drums it works like a sampler (higher = faster). Processed sounds
 | LED test | `B0 00 7D/7E/7F` (low/medium/full) |
 | Rapid update | `92 v1 v2 …` fills 64 grid → 8 right → 8 top LEDs in order; any other message resets the cursor |
 
+## Contributing / notes for developers and AI agents
+
+Contributions are welcome, especially support for more controllers. A short map of the code:
+
+| Path | What it does |
+|---|---|
+| `lpdriver/driver.py` | USB driver for the original Launchpad (`1235:000e`): pyusb/libusb, reader thread, auto-reconnect, LED state with diffing, double buffering. `python -m lpdriver` is a small demo/test. |
+| `soundboard/app.py` | The app: config (`config.json`, migrated by `migrate()`), pages, the mapping from buttons to actions (`instrument_map`), LED rendering (`compute_leds`), and the HTTP API + SSE that the web GUI uses. |
+| `soundboard/audio.py` | Mixer (sounddevice callback) with a sample-accurate frame clock (`play_data(..., at=frame)`), plus PCM streaming to browsers. |
+| `soundboard/synth.py`, `fx.py` | Instruments, drum kits and effects, all rendered offline with numpy and cached. |
+| `soundboard/transport.py` | Tempo/transport, lookahead scheduler, step sequencer timing and the looper. |
+| `soundboard/static/index.html` | The whole web GUI in one file (vanilla JS, no build step). |
+| `linux/` | udev rule, install script, systemd unit, desktop file. |
+
+**Supporting another device** (Launchpad S/Mini/X/Pro/MK3 or another grid controller):
+* The app only uses a small surface of the driver: `Launchpad(...)`, `start/stop`, `on_button`, `on_connection`,
+  `connected`, `held`, `set_leds`, `set_brightness`, `test_leds`, `animate`, plus `Button`, `Color` and
+  `all_buttons()`. A new driver that offers this same interface can be dropped in without changing the app.
+  Pulling it out into an explicit base class (and choosing the driver from the USB ID) is a good first step.
+* `Color` is red/green 0–3 because the original Launchpad has two-colour LEDs (no blue). RGB devices need a
+  richer colour type. Keep a mapping from the current named colours so existing configs and pages still work.
+* Most newer Launchpads are class-compliant USB-MIDI: use a MIDI library (e.g. `mido`/`python-rtmidi`) instead
+  of raw USB. Each model has its own programmer's reference for note numbers and SysEx LED messages.
+* The layout is 8×8 grid + 8 right buttons + 8 top buttons (`Button` ids `pad{x}{y}`, `side{y}`, `top{x}`). Devices
+  with other shapes need the page/instrument mappings in `app.py` to read their size from the driver.
+
+**Conventions:**
+* Keep it cross-platform (macOS + Linux). Put anything OS-specific behind `sys.platform` checks
+  (see `_backend()` in the driver and `DEFAULT_OUTPUT` in `app.py`).
+* Never block in or allocate heavily in the audio callback. Render sounds ahead of time and schedule them on the frame clock.
+* Lock order matters: the scheduler only *reads* transport state under its lock and must not take the app lock.
+* Config changes must be backwards compatible: add defaults and migrations in `migrate()`.
+* Write down any new hardware behaviour you discover in the protocol table above.
+* Testing without hardware: `python run.py --no-browser` works with no Launchpad attached, and with no sound
+  card the audio falls back to a timed null clock (sound streams to the browser). Most features can be driven
+  through the HTTP API (`/api/state`, `/api/instrument`, `/api/transport`, ...).
+
 ## License
 
 MIT
