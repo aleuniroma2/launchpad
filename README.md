@@ -154,3 +154,32 @@ Contributions are welcome, especially support for more controllers. A short map 
 ## License
 
 MIT
+
+## Voice page (CHIMERA)
+
+A page type that plays [CHIMERA](https://github.com/jamesondh/chimera-vocal-synth) (a physical-modelling
+voice synth, MIT) from the Launchpad. CHIMERA is not copied here: `voice/build.sh` clones it at a pinned commit,
+adds `voice/launchpad-bridge.ts` (one dynamic import line in its `main.tsx`) and builds it into `voice/dist`,
+which the server serves at `/voice/`. Needs Rust (`rustup target add wasm32-unknown-unknown`) and Bun.
+
+```sh
+voice/build.sh                                 # once (about 30 s)
+.venv/bin/python run.py --host 0.0.0.0 --no-browser
+```
+
+Set a page's type to **Voice (CHIMERA)** in the GUI, open `http://<machine-ip>:8765/voice/` on the computer with
+the speakers and click once (browsers need a click before playing sound). On a plain `http://` address Chrome
+also needs `chrome://flags/#unsafely-treat-insecure-origin-as-secure` set to that address.
+
+Side buttons: Play, Speak, Sing, Beast, Beat, Tweak, Body (Next in Tweak), Stop.
+
+| Mode | Grid |
+| --- | --- |
+| Play | piano keys (3 octaves from the body's base note), octave, Breathe, Whisper, Male / Female / Child, 26 vowels in 4 banks |
+| Sing | keys sing the typed lyrics a syllable per note; Sing, tune prev / next, Restart, 9 tunes |
+| Speak | keys say the typed lines; Say, IPA, Rate, EN / TR, Restart, 8 examples |
+| Beast | 4 animals, their calls, keys = pitch or a call, Breathe, octave |
+| Beat | 10 mouth sounds, 7 patterns, Play, tempo, Mic, hum keys, octave |
+| Tweak | CHIMERA's 19 voice encoders as 8-step sliders, 3 screens |
+
+Not on pads (still clickable on the voice page): typing the words, the IPA consonant chart, Record video, the 3D head.

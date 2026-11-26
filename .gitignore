@@ -6,3 +6,6 @@ sounds/*
 !sounds/.gitkeep
 instruments/*
 !instruments/README.md
+
+voice/chimera-src/
+voice/dist/

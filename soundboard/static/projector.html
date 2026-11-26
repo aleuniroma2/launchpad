@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Launchpad Projector</title>
+<style>
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;cursor:none}
+  video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;opacity:0;transition:opacity .12s}
+  video.on{opacity:1}
+  #hint{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+        color:#888;font:20px system-ui,sans-serif;text-align:center;gap:10px;cursor:pointer}
+  #hint small{color:#555;font-size:15px}
+  #hint.hide{display:none}
+</style></head>
+<body>
+<div id="hint">Click once to go fullscreen<small>Press a pad and its video plays here (muted — sound comes from the Launchpad)</small></div>
+<video id="a" muted playsinline preload="auto"></video>
+<video id="b" muted playsinline preload="auto"></video>
+<script>
+const vids = [document.getElementById("a"), document.getElementById("b")];
+let front = 0, curKey = null;
+const hint = document.getElementById("hint");
+hint.onclick = () => { hint.classList.add("hide"); (document.documentElement.requestFullscreen || (()=>{})).call(document.documentElement).catch(()=>{}); };
+addEventListener("dblclick", () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen());
+
+function clear() { vids.forEach(v => { v.classList.remove("on"); v.pause(); }); curKey = null; }
+function play(e) {
+  const next = vids[1 - front], prev = vids[front];
+  next.muted = true;                       // sound comes only from the Launchpad engine
+  next.loop = !!e.loop;
+  next.src = "/videos/" + encodeURIComponent(e.video);
+  next.currentTime = 0;
+  const go = () => {
+    next.play().catch(() => {});
+    next.classList.add("on"); prev.classList.remove("on"); prev.pause();
+    front = 1 - front; curKey = e.key;
+  };
+  if (next.readyState >= 2) go(); else next.addEventListener("loadeddata", go, {once: true});
+  next.onended = () => { if (!next.loop && curKey === e.key) { next.classList.remove("on"); curKey = null; } };
+}
+function connect() {
+  const es = new EventSource("/api/projector");
+  es.onmessage = m => {
+    const e = JSON.parse(m.data);
+    if (e.cmd === "play") play(e);
+    else if (e.cmd === "stop" && e.key === curKey) clear();
+    else if (e.cmd === "stop_page" && curKey && curKey.startsWith(e.prefix)) clear();
+    else if (e.cmd === "stop_all") clear();
+  };
+  es.onerror = () => { es.close(); setTimeout(connect, 1500); };
+}
+connect();
+</script></body></html>

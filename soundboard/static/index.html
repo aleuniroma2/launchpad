@@ -174,7 +174,7 @@ details.fx summary b { color: var(--ink); font-weight: 600; }
         <span>Top row = pages</span>
         <span class="row" style="flex:0 1 auto">
           <select id="pageType" aria-label="Page type" class="dark">
-            <option value="soundboard">Soundboard</option><option value="piano">Piano / synth</option><option value="drums">Drum kit</option><option value="sequencer">Step sequencer</option><option value="looper">Looper</option>
+            <option value="soundboard">Soundboard</option><option value="piano">Piano / synth</option><option value="drums">Drum kit</option><option value="sequencer">Step sequencer</option><option value="looper">Looper</option><option value="voice">Voice (CHIMERA)</option>
           </select>
           <input type="text" id="pageName" aria-label="Page name">
         </span>
@@ -339,9 +339,28 @@ function fxPanel(cur, onChange, note) {
 }
 let fxOpen = false;
 
+function renderVoice() {
+  const v = snap.voice || {}, url = location.origin + "/voice/";
+  $("#editor").innerHTML = `
+    <h2>Voice (CHIMERA)</h2>
+    <div class="sub">A physical-modelling voice, played from this page. Open it on the computer with the speakers and click once to enable sound.</div>
+    <div class="field"><label>Open the voice page</label>
+      <div class="row"><a href="/voice/" target="_blank" style="color:inherit">${esc(url)} ↗</a></div>
+      <div class="sub">Chrome blocks audio on a plain http address. On the computer that plays the voice, open
+      <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code>, add <code>${esc(location.origin)}</code>, enable it and restart Chrome.</div></div>
+    <div class="field"><label>Pad map</label>
+      <div class="sub"><b>Side:</b> Play · Speak · Sing · Beast · Beat · Tweak · Body (Next ▸ in Tweak) · Stop.<br>
+      <b>Play:</b> keys, vowels (4 banks), body, breathe, whisper, octave. <b>Sing / Speak:</b> keys sing or say the typed words one syllable per note,
+      Sing/Say button, tunes, examples, rate, IPA, EN/TR.<br>
+      <b>Beast:</b> 4 animals, their calls, keys = pitch or a call. <b>Beat:</b> 10 mouth sounds, 7 patterns, play, tempo, mic, hum keys.<br>
+      <b>Tweak:</b> 19 voice controls as 8-step sliders (3 screens). Type the words to sing or say on the voice page itself.</div></div>
+    <div class="sub">Now: mode <b>${esc(v.mode || "")}</b>${v.tweak ? " · tweak" : ""} · body <b>${esc(v.body || "")}</b> · octave ${v.octave ?? 0}</div>`;
+}
+
 function renderInstrumentEditor() {
   const ed = $("#editor"), p = page(), sy = S.synth, type = snap.page_type;
   if (type === "looper") return renderLooper();
+  if (type === "voice") return renderVoice();
   const inst = snap.inst;
   const send = patch => api("/api/instrument", {page: p, inst: patch});
   const sendSeq = patch => api("/api/instrument", {page: p, seq: patch});
@@ -551,6 +570,7 @@ function renderEditor() {
   const exists = !!btnCfg(selected);
   const b = btnCfg(selected) || {...S.defaults};
   const where = selected.startsWith("side") ? `Side button ${+selected.slice(4) + 1}` : `Pad column ${+selected[3] + 1}, row ${+selected[4] + 1}`;
+  const vopts = ['<option value="">— none —</option>'].concat((S.videos || []).map(v => `<option ${v === b.video ? "selected" : ""}>${esc(v)}</option>`)).join("");
   const opts = ['<option value="">— none —</option>'].concat(S.sounds.map(s => `<option ${s === b.sound ? "selected" : ""}>${esc(s)}</option>`)).join("");
   ed.innerHTML = `
     <h2>${where}</h2><div class="sub">${S.config.pages[page()].name} · changes save automatically</div>
@@ -563,7 +583,11 @@ function renderEditor() {
       <div class="field"><label for="fSound">Sound</label>
         <div class="row"><select id="fSound">${opts}</select>
           <button id="preview" title="Preview through the speakers">▶ Preview</button>
-          <button id="uploadBtn">Upload…</button><input type="file" id="file" accept="audio/*" multiple hidden></div></div>
+          <button id="uploadBtn">Upload…</button><input type="file" id="file" accept="audio/*,video/*,.mp4,.webm,.mov,.m4v,.ogv" multiple hidden></div></div>
+      <div class="field"><label for="fVideo">Projector video <small>(muted, plays with the sound)</small></label>
+        <div class="row"><select id="fVideo">${vopts}</select>
+          <button id="uploadVideoBtn">Upload video…</button><input type="file" id="vfile" accept="video/*" hidden>
+          <a href="/projector" target="_blank" style="color:inherit">Open projector ↗</a></div></div>
       <div class="field"><label for="fMode">Playback</label>
         <div class="row"><select id="fMode">
           <option value="oneshot">One-shot (press again restarts)</option>
@@ -590,6 +614,14 @@ function renderEditor() {
   $("#fAction").onchange = e => { set({action: e.target.value}).then(renderEditor); };
   $("#fSound").onchange = e => { const s = e.target.value; const c = cur(); set({sound: s, label: c.label || s.replace(/\.[^.]+$/, "")}).then(renderEditor); };
   $("#fMode").onchange = e => set({mode: e.target.value});
+  $("#fVideo").onchange = e => set({video: e.target.value});
+  $("#uploadVideoBtn").onclick = () => $("#vfile").click();
+  $("#vfile").onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    const res = await fetch("/api/upload_video", {method: "POST", headers: {"X-Filename": f.name}, body: f}).then(r => r.json());
+    if (res.error) return alert(`${f.name}: ${res.error}`);
+    S.videos = res.videos; await set({video: res.name}); renderEditor();
+  };
   $("#fLoop").onchange = e => set({loop: e.target.checked});
   $("#fVol").oninput = e => $("#volTxt").textContent = Math.round(e.target.value * 100) + "%";
   $("#fVol").onchange = e => set({volume: +e.target.value});
@@ -597,9 +629,17 @@ function renderEditor() {
   $("#preview").onclick = () => { const s = $("#fSound").value; if (s) api("/api/preview", {sound: s, volume: +$("#fVol").value, fx: cur().fx}); };
   $("#uploadBtn").onclick = () => $("#file").click();
   $("#file").onchange = async e => {
-    let last = null;
-    for (const f of e.target.files) last = (await upload(f)) || last;
-    if (last) { const c = cur(); await set({sound: last.name, label: c.label || last.name.replace(/\.[^.]+$/, "")}); renderEditor(); }
+    let last = null, vid = null;
+    for (const f of e.target.files) {
+      if (/\.(mp4|webm|mov|m4v|ogv)$/i.test(f.name) || f.type.startsWith("video/")) {
+        const res = await fetch("/api/upload_video", {method: "POST", headers: {"X-Filename": f.name}, body: f}).then(r => r.json());
+        if (res.error) alert(`${f.name}: ${res.error}`); else { S.videos = res.videos; vid = res; }
+      } else last = (await upload(f)) || last;
+    }
+    const c = cur(), patch = {};
+    if (last) { patch.sound = last.name; patch.label = c.label || last.name.replace(/\.[^.]+$/, ""); }
+    if (vid) { patch.video = vid.name; if (!patch.label && !c.label) patch.label = vid.name.replace(/\.[^.]+$/, ""); }
+    if (last || vid) { await set(patch); renderEditor(); }
   };
   ed.querySelectorAll(".sw").forEach(sw => sw.onclick = () => {
     set({[sw.dataset.key]: sw.dataset.c.split(",").map(Number)}).then(renderEditor);
@@ -670,6 +710,7 @@ async function init() {
     if (!isInst && $("#follow").checked && snap.held.length && snap.last_press !== selected && snap.held.includes(snap.last_press)) {
       selected = snap.last_press; renderEditor();
     } else if (pageChanged || (isInst && (JSON.stringify(snap.inst) !== JSON.stringify(prev.inst)
+        || JSON.stringify(snap.voice) !== JSON.stringify(prev.voice)
         || seqShape(snap) !== seqShape(prev) || (snap.page_type === "looper" && loopShape(snap) !== loopShape(prev))))) {
       if (isInst && selected && selected.startsWith("top")) selected = null;
       renderEditor();
